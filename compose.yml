@@ -4,15 +4,15 @@ services:
     container_name: shrtik_db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: shrtik
-      POSTGRES_PASSWORD: shrtik
-      POSTGRES_DB: shrtik
+      POSTGRES_USER: ${DB_USER:-shrtik}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-shrtik}
+      POSTGRES_DB: ${DB_NAME:-shrtik}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U shrtik"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-shrtik}"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -22,7 +22,7 @@ services:
     container_name: shrtik_redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -34,21 +34,25 @@ services:
     container_name: shrtik_app
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${SERVER_PORT:-8080}:8080"
     environment:
       DB_HOST: db
       DB_PORT: 5432
-      DB_USER: shrtik
-      DB_PASSWORD: shrtik
-      DB_NAME: shrtik
+      DB_USER: ${DB_USER:-shrtik}
+      DB_PASSWORD: ${DB_PASSWORD:-shrtik}
+      DB_NAME: ${DB_NAME:-shrtik}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_TTL: ${JWT_TTL:-24h}
+      SERVER_PORT: 8080
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    env_file:
+      - .env
 
 volumes:
   db_data:

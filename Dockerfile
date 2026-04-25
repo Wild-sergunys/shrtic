@@ -1,5 +1,5 @@
-# Stage 1: сборка под Linux
-FROM golang:1.25-alpine AS builder
+# Dockerfile
+FROM golang:1.22-alpine AS builder
 
 WORKDIR /app
 
@@ -7,17 +7,19 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /shrtik cmd/server/main.go
 
-# Stage 2: минимальный образ
+RUN CGO_ENABLED=0 GOOS=linux go build -o /shrtik ./cmd/server
+
 FROM alpine:latest
 
-WORKDIR /app
+RUN apk --no-cache add ca-certificates
+
+WORKDIR /root/
 
 COPY --from=builder /shrtik .
+COPY --from=builder /app/migrations ./migrations
 
-RUN adduser -D -g '' appuser
-USER appuser
+# Не копируем .env в образ - будет через volumes или env vars
 
 EXPOSE 8080
 
