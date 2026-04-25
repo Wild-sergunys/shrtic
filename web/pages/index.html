@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SHRTIK // сокращатель ссылок</title>
+  <link rel="stylesheet" href="../static/app.css">
+</head>
+<body>
+  <header>
+    <a href="index.html" class="logo">SHRTIK</a>
+    <nav>
+      <a href="cabinet.html">/cabinet</a>
+      <a href="auth.html">/login</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>SHRTIK</h1>
+      <p>// вставь длинную ссылку — получи короткую</p>
+      <form class="shorten-form">
+        <input type="url" name="url" placeholder="https://your-very-long-url.com/..." required>
+        <button type="submit" class="btn btn-accent">Сократить</button>
+      </form>
+    </section>
+  </main>
+
+  <footer>SHRTIK v1.0.0</footer>
+
+  <!-- Скрипты -->
+  <script src="../static/mock.js"></script>
+  <script src="../static/api.js"></script>
+  <script src="../static/utils.js"></script>
+  <script src="../static/main.js"></script>
+</body>
+</html>

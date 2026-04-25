@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вход // SHRTIK</title>
+  <link rel="stylesheet" href="../static/app.css">
+</head>
+<body>
+  <header>
+    <a href="index.html" class="logo">SHRTIK</a>
+    <nav>
+      <a href="cabinet.html">/cabinet</a>
+      <a href="auth.html">/login</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="auth-container">
+
+      <input type="radio" name="tab" id="tab-login" checked>
+      <input type="radio" name="tab" id="tab-register">
+
+      <div class="tabs">
+        <label for="tab-login">Вход</label>
+        <label for="tab-register">Регистрация</label>
+      </div>
+
+      <div class="tab-content tab-login">
+        <div class="auth-card">
+          <h2>Вход</h2>
+          <form class="form-stack">
+            <input type="text" name="login" placeholder="Логин" required>
+            <input type="password" name="password" placeholder="Пароль" required>
+            <button type="submit" class="btn btn-accent btn-block">Войти</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="tab-content tab-register">
+        <div class="auth-card">
+          <h2>Регистрация</h2>
+          <form class="form-stack">
+            <input type="text" name="login" placeholder="Придумайте логин" required>
+            <input type="password" name="password" placeholder="Пароль (мин. 6 символов)" required>
+            <button type="submit" class="btn btn-accent btn-block">Создать аккаунт</button>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <footer>// доступ по токену</footer>
+
+  <!-- Скрипты (utils.js теперь на месте) -->
+  <script src="../static/mock.js"></script>
+  <script src="../static/api.js"></script>
+  <script src="../static/utils.js"></script>
+  <script src="../static/auth.js"></script>
+</body>
+</html>

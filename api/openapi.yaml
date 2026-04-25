@@ -1,0 +1,546 @@
+openapi: 3.0.0
+info:
+  title: SHRTIK API
+  description: |
+    Сервис сокращения ссылок с аналитикой переходов.
+    
+    Аутентификация:
+    - Пользователь регистрируется и входит, получает JWT токен
+    - Токен передаётся в заголовке Authorization: Bearer <token>
+    - Токен живёт 24 часа
+    
+    Сокращение ссылок:
+    - Создать короткую ссылку может любой, даже без авторизации
+    - Просмотр истории и статистики — только для авторизованных
+    - При переходе по короткой ссылке автоматически собирается статистика
+    
+    Статистика:
+    - Браузеры (Chrome, Firefox, Safari, Other)
+    - Устройства (Desktop, Mobile, Tablet)
+    - Страны (определяется по IP)
+    - Источники перехода (заголовок Referer)
+
+    Типы ошибок:
+    - validation_error — ошибка валидации входных данных (400)
+    - invalid_credentials — неверный логин или пароль (401)
+    - unauthorized — не авторизован (401)
+    - not_found — ресурс не найден (404)
+    - conflict — конфликт данных, например логин уже занят (409)
+    - internal_error — внутренняя ошибка сервера (500)
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: Локальный сервер разработки
+
+tags:
+  - name: Auth
+    description: Аутентификация и управление пользователями
+  - name: Links
+    description: Сокращение, управление и статистика ссылок
+  - name: Redirect
+    description: Переход по коротким ссылкам
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT токен, полученный в ответе /api/auth/login.
+        Пример: Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+
+  schemas:
+
+    RegisterRequest:
+      type: object
+      required: [login, password]
+      properties:
+        login:
+          type: string
+          minLength: 3
+          maxLength: 50
+          description: Уникальный логин пользователя
+          example: "username"
+        password:
+          type: string
+          minLength: 6
+          maxLength: 100
+          format: password
+          description: Пароль, будет захэширован через bcrypt
+          example: "secret123"
+
+    LoginRequest:
+      type: object
+      required: [login, password]
+      properties:
+        login:
+          type: string
+          description: Логин пользователя
+          example: "username"
+        password:
+          type: string
+          format: password
+          description: Пароль
+          example: "secret123"
+
+    LoginResponse:
+      type: object
+      description: Ответ при успешном входе
+      properties:
+        token:
+          type: string
+          description: JWT токен для авторизации
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        role:
+          type: string
+          enum: [user]
+          description: Роль пользователя
+          example: "user"
+
+    MeResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        login:
+          type: string
+          example: "username"
+        created_at:
+          type: string
+          format: date-time
+
+    CreateLinkRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Длинный URL для сокращения
+          example: "https://github.com/username/very-long-repository-name"
+
+    Link:
+      type: object
+      description: Информация о ссылке
+      properties:
+        id:
+          type: integer
+          description: Уникальный идентификатор
+          example: 42
+        short_url:
+          type: string
+          description: Относительный путь короткой ссылки
+          example: "/x7kQ2"
+        long_url:
+          type: string
+          description: Оригинальный длинный URL
+          example: "https://github.com/username/very-long-repository-name"
+        clicks:
+          type: integer
+          description: Общее количество переходов
+          example: 1247
+        created_at:
+          type: string
+          format: date-time
+          description: Дата и время создания
+
+    StatItem:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Название элемента, например Chrome, Desktop, Россия, Twitter
+        percentage:
+          type: number
+          format: double
+          description: Процент от общего числа переходов
+          example: 62.5
+        count:
+          type: integer
+          description: Абсолютное количество переходов
+          example: 780
+
+    LinkStats:
+      type: object
+      description: Полная статистика по ссылке
+      properties:
+        total_clicks:
+          type: integer
+          description: Общее количество переходов
+          example: 1247
+        browsers:
+          type: array
+          description: Распределение по браузерам, топ-3 плюс Other
+          items:
+            $ref: '#/components/schemas/StatItem'
+        devices:
+          type: array
+          description: Распределение по типам устройств
+          items:
+            $ref: '#/components/schemas/StatItem'
+        countries:
+          type: array
+          description: Распределение по странам
+          items:
+            $ref: '#/components/schemas/StatItem'
+        referrers:
+          type: array
+          description: Распределение по источникам перехода
+          items:
+            $ref: '#/components/schemas/StatItem'
+
+    IdResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Идентификатор созданной сущности
+          example: 5
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Информационное сообщение
+          example: "Операция выполнена успешно"
+
+    ErrorResponse:
+      type: object
+      description: Стандартный ответ с ошибкой
+      properties:
+        error:
+          type: string
+          description: Тип ошибки
+          example: "validation_error"
+        message:
+          type: string
+          description: Человекочитаемое сообщение
+          example: "Поле url обязательно"
+        details:
+          type: object
+          additionalProperties: true
+          description: Дополнительные детали ошибки, опционально
+
+paths:
+
+  /api/auth/register:
+    post:
+      summary: Регистрация нового пользователя
+      description: |
+        Создаёт новую учётную запись с ролью user.
+        Доступно без авторизации.
+      operationId: register
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              valid:
+                value:
+                  login: "username"
+                  password: "secret123"
+      responses:
+        '201':
+          description: Пользователь успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdResponse'
+              example:
+                id: 1
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                short_password:
+                  value:
+                    error: "validation_error"
+                    message: "Пароль должен быть не менее 6 символов"
+                conflict:
+                  value:
+                    error: "conflict"
+                    message: "Пользователь с таким логином уже существует"
+
+  /api/auth/login:
+    post:
+      summary: Вход в систему
+      description: |
+        Аутентификация пользователя по логину и паролю.
+        Возвращает JWT токен для доступа к защищённым эндпоинтам.
+      operationId: login
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Успешный вход
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                role: "user"
+        '401':
+          description: Неверный логин или пароль
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "invalid_credentials"
+                message: "Неверный логин или пароль"
+
+  /api/auth/logout:
+    post:
+      summary: Выход из системы
+      description: |
+        Завершение сеанса. Клиент должен удалить JWT токен на своей стороне.
+        Сервер не хранит состояние токенов.
+      operationId: logout
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Успешный выход
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: "Выход выполнен успешно"
+
+  /api/auth/me:
+    get:
+      summary: Информация о текущем пользователе
+      description: Возвращает данные авторизованного пользователя
+      operationId: getMe
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Данные пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/links:
+    post:
+      summary: Сократить ссылку
+      description: |
+        Создаёт короткую ссылку для переданного URL.
+        Доступно без авторизации. Если пользователь авторизован, ссылка привязывается к нему.
+      operationId: createLink
+      tags: [Links]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLinkRequest'
+      responses:
+        '201':
+          description: Ссылка создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Link'
+              example:
+                id: 42
+                short_url: "/x7kQ2"
+                long_url: "https://github.com/username/repo"
+                clicks: 0
+                created_at: "2026-04-24T20:30:00Z"
+        '400':
+          description: Невалидный URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "validation_error"
+                message: "Некорректный URL"
+
+    get:
+      summary: Список ссылок пользователя
+      description: |
+        Возвращает все ссылки, созданные авторизованным пользователем.
+        Поддерживает поиск по оригинальному URL.
+      operationId: listLinks
+      tags: [Links]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Поиск по оригинальному URL, частичное совпадение
+          example: "github"
+      responses:
+        '200':
+          description: Список ссылок
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Link'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/links/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Идентификатор ссылки
+        schema:
+          type: integer
+          minimum: 1
+    delete:
+      summary: Удалить ссылку
+      description: Удаляет ссылку и всю связанную с ней статистику
+      operationId: deleteLink
+      tags: [Links]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Ссылка удалена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: "Ссылка удалена"
+        '401':
+          description: Не авторизован
+        '403':
+          description: Нельзя удалить чужую ссылку
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Ссылка не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/links/{id}/stats:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Идентификатор ссылки
+        schema:
+          type: integer
+          minimum: 1
+    get:
+      summary: Статистика по ссылке
+      description: |
+        Возвращает агрегированную статистику переходов:
+        браузеры, устройства, страны, источники перехода.
+      operationId: getLinkStats
+      tags: [Links]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Статистика по ссылке
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkStats'
+              example:
+                total_clicks: 1247
+                browsers:
+                  - { name: "Chrome", percentage: 62, count: 773 }
+                  - { name: "Firefox", percentage: 18, count: 225 }
+                  - { name: "Safari", percentage: 12, count: 150 }
+                  - { name: "Other", percentage: 8, count: 99 }
+                devices:
+                  - { name: "Desktop", percentage: 71, count: 885 }
+                  - { name: "Mobile", percentage: 24, count: 299 }
+                  - { name: "Tablet", percentage: 5, count: 63 }
+                countries:
+                  - { name: "Россия", percentage: 45, count: 561 }
+                  - { name: "США", percentage: 28, count: 349 }
+                  - { name: "Германия", percentage: 15, count: 187 }
+                  - { name: "Other", percentage: 12, count: 150 }
+                referrers:
+                  - { name: "Прямой", percentage: 45, count: 561 }
+                  - { name: "Twitter", percentage: 28, count: 349 }
+                  - { name: "Telegram", percentage: 22, count: 274 }
+                  - { name: "Other", percentage: 5, count: 63 }
+        '401':
+          description: Не авторизован
+        '404':
+          description: Ссылка не найдена
+
+  /{code}:
+    parameters:
+      - name: code
+        in: path
+        required: true
+        description: Короткий код ссылки
+        schema:
+          type: string
+          example: "x7kQ2"
+    get:
+      summary: Переход по короткой ссылке
+      description: |
+        Перенаправляет (302 Found) на оригинальный URL.
+        При переходе автоматически собирается статистика:
+        браузер, устройство, страна, источник.
+      operationId: redirect
+      tags: [Redirect]
+      responses:
+        '302':
+          description: Перенаправление на оригинальный URL
+          headers:
+            Location:
+              description: Оригинальный URL
+              schema:
+                type: string
+                example: "https://github.com/username/repo"
+        '404':
+          description: Ссылка не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "not_found"
+                message: "Ссылка не найдена"
