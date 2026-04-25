@@ -1,0 +1,81 @@
+# >>>>>>>>>>>>>>>>>>>>>>>>
+# Бинарники и компиляция
+# >>>>>>>>>>>>>>>>>>>>>>>>
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+shrtik
+shrtik.exe
+/server
+/server.exe
+/dist/
+/bin/
+
+# >>>>>>>>>>>>>>>
+# Зависимости Go
+# >>>>>>>>>>>>>>>
+vendor/
+
+# >>>>>>>>>>>
+# Файлы IDE
+# >>>>>>>>>>>
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# GoLand
+.idea/
+
+# Vim
+*.swp
+*.swo
+*~
+
+# >>>>>>>>>>>>>>>>>
+# Системные файлы
+# >>>>>>>>>>>>>>>>>
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
+
+# >>>>>>>>>>>>>>>>>>>>>>>>
+# Конфигурация и секреты
+# >>>>>>>>>>>>>>>>>>>>>>>>
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+configs/config.yaml
+!configs/config.example.yaml
+
+# >>>>>>>>
+# Docker
+# >>>>>>>>
+docker-compose.override.yml
+.DS_Store
+data/
+db_data/
+
+# >>>>>>>>>>>>>>>>>>>>>>>>
+# Логи и временные файлы
+# >>>>>>>>>>>>>>>>>>>>>>>>
+*.log
+logs/
+tmp/
+temp/
