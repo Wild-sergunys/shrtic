@@ -1,10 +1,21 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/Wild-sergunys/shrtic/internal/config"
 	"github.com/Wild-sergunys/shrtic/internal/database"
+	"github.com/Wild-sergunys/shrtic/internal/handler"
+	"github.com/Wild-sergunys/shrtic/internal/middleware"
+	"github.com/Wild-sergunys/shrtic/internal/repository"
+	"github.com/Wild-sergunys/shrtic/internal/service"
 )
 
 func main() {
@@ -19,6 +30,7 @@ func main() {
 	}
 	defer db.Close()
 
+	// Миграции
 	if err := database.RunMigrations(cfg.DB.MigrateDSN()); err != nil {
 		log.Fatalf("Ошибка миграций: %v", err)
 	}
@@ -29,5 +41,63 @@ func main() {
 	}
 	defer redisClient.Close()
 
-	log.Println("Все сервисы запущены")
+	// Репозитории
+	userRepo := repository.NewUserRepository(db)
+
+	// Сервисы
+	authService := service.NewAuthService(userRepo, cfg.JWT.Secret, cfg.JWT.TTL)
+
+	// Хендлеры
+	authHandler := handler.NewAuthHandler(authService)
+
+	// Middleware
+	authMiddleware := middleware.AuthMiddleware([]byte(cfg.JWT.Secret))
+
+	// Роутер
+	mux := http.NewServeMux()
+
+	// Health check
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok"}`))
+	})
+
+	// Auth
+	mux.HandleFunc("POST /api/auth/register", authHandler.Register)
+	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
+	mux.Handle("POST /api/auth/logout", authMiddleware(http.HandlerFunc(authHandler.Logout)))
+	mux.Handle("GET /api/auth/me", authMiddleware(http.HandlerFunc(authHandler.Me)))
+
+	// Сервер
+	srv := &http.Server{
+		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),
+		Handler:      mux,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	stop := make(chan os.Signal, 2)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		log.Printf("Сервер запущен на http://localhost%s", srv.Addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Ошибка запуска сервера: %v", err)
+		}
+	}()
+
+	<-stop
+	log.Println("Получен сигнал остановки")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	log.Println("Ожидание завершения активных запросов...")
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("Сервер завершён принудительно: %v", err)
+	} else {
+		log.Println("Все запросы завершены корректно")
+	}
 }

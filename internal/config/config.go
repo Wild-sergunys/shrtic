@@ -39,7 +39,7 @@ type ServerConfig struct {
 func Load() (*Config, error) {
 	cfg := &Config{
 		DB: DBConfig{
-			Host:     getEnv("DB_HOST", "localhost"),
+			Host:     getEnv("DB_HOST", "db"),
 			Port:     getEnvInt("DB_PORT", 5432),
 			User:     getEnv("DB_USER", "shrtic"),
 			Password: getEnv("DB_PASSWORD", "shrtic"),

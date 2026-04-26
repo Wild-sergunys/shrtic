@@ -19,7 +19,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: shrtik_redis
+    container_name: shrtic_redis
     restart: unless-stopped
     ports:
       - "${REDIS_PORT:-6379}:6379"
@@ -31,7 +31,7 @@ services:
 
   app:
     build: .
-    container_name: shrtiс_app
+    container_name: shrtic_app
     restart: unless-stopped
     ports:
       - "${SERVER_PORT:-8080}:8080"
