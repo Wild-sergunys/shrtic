@@ -43,12 +43,16 @@ func main() {
 
 	// Репозитории
 	userRepo := repository.NewUserRepository(db)
+	linkRepo := repository.NewLinkRepository(db)
 
 	// Сервисы
 	authService := service.NewAuthService(userRepo, cfg.JWT.Secret, cfg.JWT.TTL)
+	linkService := service.NewLinkService(linkRepo, redisClient)
 
 	// Хендлеры
 	authHandler := handler.NewAuthHandler(authService)
+	linkHandler := handler.NewLinkHandler(linkService)
+	redirectHandler := handler.NewRedirectHandler(linkService)
 
 	// Middleware
 	authMiddleware := middleware.AuthMiddleware([]byte(cfg.JWT.Secret))
@@ -68,6 +72,14 @@ func main() {
 	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
 	mux.Handle("POST /api/auth/logout", authMiddleware(http.HandlerFunc(authHandler.Logout)))
 	mux.Handle("GET /api/auth/me", authMiddleware(http.HandlerFunc(authHandler.Me)))
+
+	// Links
+	mux.Handle("POST /api/links", authMiddleware(http.HandlerFunc(linkHandler.CreateShortLink)))
+	mux.Handle("GET /api/links", authMiddleware(http.HandlerFunc(linkHandler.GetLinks)))
+	mux.Handle("DELETE /api/links/{id}", authMiddleware(http.HandlerFunc(linkHandler.DeleteLink)))
+
+	// Redirect (публичный)
+	mux.HandleFunc("GET /{code}", redirectHandler.RedirectToLongURL)
 
 	// Сервер
 	srv := &http.Server{
