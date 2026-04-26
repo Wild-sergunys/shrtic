@@ -3,8 +3,11 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
+	"net/http"
 	"strings"
 	"time"
 
@@ -61,7 +64,7 @@ func (s *LinkService) CreateShortLink(ctx context.Context, longURL string, userI
 
 	link := &model.Link{
 		UserID:   userID,
-		ShortURL: "/" + code,
+		ShortURL: "/r/" + code,
 		LongURL:  longURL,
 	}
 
@@ -69,7 +72,7 @@ func (s *LinkService) CreateShortLink(ctx context.Context, longURL string, userI
 		return nil, fmt.Errorf("ошибка создания ссылки: %w", err)
 	}
 
-	if err := s.redis.Set(ctx, "/"+code, longURL, cacheTTL).Err(); err != nil {
+	if err := s.redis.Set(ctx, "/r/"+code, longURL, cacheTTL).Err(); err != nil {
 		return nil, fmt.Errorf("ошибка кэширования: %w", err)
 	}
 
@@ -95,6 +98,17 @@ func (s *LinkService) GetLongURL(ctx context.Context, code string) (string, erro
 	return link.LongURL, nil
 }
 
+func (s *LinkService) GetLinkByCode(ctx context.Context, code string) (*model.Link, error) {
+	link, err := s.linkRepo.FindByShortCode(ctx, code)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка поиска ссылки: %w", err)
+	}
+	if link == nil {
+		return nil, fmt.Errorf("ссылка не найдена")
+	}
+	return link, nil
+}
+
 func (s *LinkService) GetLinks(ctx context.Context, userID int64, search string) ([]model.Link, error) {
 	return s.linkRepo.FindByUserID(ctx, userID, search)
 }
@@ -115,12 +129,119 @@ func (s *LinkService) DeleteLink(ctx context.Context, userID int64, linkID int64
 		return fmt.Errorf("ошибка удаления ссылки: %w", err)
 	}
 
-	code := link.ShortURL
-	s.redis.Del(ctx, code)
+	s.redis.Del(ctx, link.ShortURL)
 
 	return nil
 }
 
 func (s *LinkService) RecordClick(ctx context.Context, linkID int64) error {
 	return s.linkRepo.IncrementClicks(ctx, linkID)
+}
+
+func (s *LinkService) SaveClickStats(ctx context.Context, linkID int64, userAgent, referer, clientIP string) error {
+	browser, device := parseUserAgent(userAgent)
+	country := getCountry(clientIP)
+	source := parseReferer(referer)
+
+	_, err := s.linkRepo.SaveClickStat(ctx, linkID, browser, device, country, source)
+	return err
+}
+
+func (s *LinkService) GetStats(ctx context.Context, userID int64, linkID int64) (*model.LinkStats, error) {
+	link, err := s.linkRepo.FindByID(ctx, linkID)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка поиска ссылки: %w", err)
+	}
+	if link == nil {
+		return nil, fmt.Errorf("ссылка не найдена")
+	}
+	if link.UserID == nil || *link.UserID != userID {
+		return nil, fmt.Errorf("нет прав на просмотр статистики")
+	}
+
+	return s.linkRepo.GetStats(ctx, linkID)
+}
+
+func getCountry(ip string) string {
+	if ip == "" || ip == "127.0.0.1" || ip == "::1" {
+		return "localhost"
+	}
+
+	url := fmt.Sprintf("http://ip-api.com/json/%s?fields=country", ip)
+	resp, err := http.Get(url)
+	if err != nil {
+		return "unknown"
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "unknown"
+	}
+
+	var result struct {
+		Country string `json:"country"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "unknown"
+	}
+
+	if result.Country != "" {
+		return result.Country
+	}
+	return "unknown"
+}
+
+func parseUserAgent(ua string) (browser, device string) {
+	ua = strings.ToLower(ua)
+
+	switch {
+	case strings.Contains(ua, "firefox"):
+		browser = "Firefox"
+	case strings.Contains(ua, "safari"):
+		browser = "Safari"
+	case strings.Contains(ua, "chrome"):
+		browser = "Chrome"
+	default:
+		browser = "Other"
+	}
+
+	switch {
+	case strings.Contains(ua, "mobile"):
+		device = "Mobile"
+	case strings.Contains(ua, "tablet"):
+		device = "Tablet"
+	default:
+		device = "Desktop"
+	}
+
+	return
+}
+
+func parseReferer(referer string) string {
+	if referer == "" {
+		return "Прямой"
+	}
+	referer = strings.ToLower(referer)
+
+	switch {
+	case strings.Contains(referer, "twitter.com") || strings.Contains(referer, "x.com"):
+		return "Twitter"
+	case strings.Contains(referer, "t.me"):
+		return "Telegram"
+	case strings.Contains(referer, "facebook.com"):
+		return "Facebook"
+	case strings.Contains(referer, "instagram.com"):
+		return "Instagram"
+	case strings.Contains(referer, "youtube.com"):
+		return "YouTube"
+	case strings.Contains(referer, "reddit.com"):
+		return "Reddit"
+	case strings.Contains(referer, "linkedin.com"):
+		return "LinkedIn"
+	case strings.Contains(referer, "google.com") || strings.Contains(referer, "google.ru"):
+		return "Google"
+	default:
+		return "Other"
+	}
 }

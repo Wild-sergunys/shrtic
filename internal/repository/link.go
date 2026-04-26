@@ -108,3 +108,74 @@ func (r *LinkRepository) IncrementClicks(ctx context.Context, id int64) error {
 	}
 	return nil
 }
+
+func (r *LinkRepository) SaveClickStat(ctx context.Context, linkID int64, browser, device, country, referer string) (int64, error) {
+	var statID int64
+	query := `INSERT INTO stats (link_id, browser, device_type, country, referer) VALUES ($1, $2, $3, $4, $5) RETURNING id`
+	err := r.db.QueryRow(ctx, query, linkID, browser, device, country, referer).Scan(&statID)
+	if err != nil {
+		return 0, fmt.Errorf("не удалось сохранить статистику: %w", err)
+	}
+	return statID, nil
+}
+
+func (r *LinkRepository) GetStats(ctx context.Context, linkID int64) (*model.LinkStats, error) {
+	stats := &model.LinkStats{}
+
+	err := r.db.QueryRow(ctx, `SELECT clicks FROM links WHERE id = $1`, linkID).Scan(&stats.TotalClicks)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("ссылка не найдена")
+		}
+		return nil, fmt.Errorf("не удалось получить счётчик: %w", err)
+	}
+
+	browsers, _ := r.getGroupedStats(ctx, linkID, "browser")
+	stats.Browsers = browsers
+
+	devices, _ := r.getGroupedStats(ctx, linkID, "device_type")
+	stats.Devices = devices
+
+	countries, _ := r.getGroupedStats(ctx, linkID, "country")
+	stats.Countries = countries
+
+	referrers, _ := r.getGroupedStats(ctx, linkID, "referer")
+	stats.Referrers = referrers
+
+	return stats, nil
+}
+
+func (r *LinkRepository) getGroupedStats(ctx context.Context, linkID int64, field string) ([]model.StatItem, error) {
+	query := fmt.Sprintf(`
+		SELECT %s, COUNT(*) as count
+		FROM stats
+		WHERE link_id = $1 AND %s IS NOT NULL
+		GROUP BY %s
+		ORDER BY count DESC
+	`, field, field, field)
+
+	rows, err := r.db.Query(ctx, query, linkID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []model.StatItem
+	var total int
+	for rows.Next() {
+		var item model.StatItem
+		if err := rows.Scan(&item.Name, &item.Count); err != nil {
+			continue
+		}
+		items = append(items, item)
+		total += item.Count
+	}
+
+	for i := range items {
+		if total > 0 {
+			items[i].Percentage = float64(items[i].Count) / float64(total) * 100
+		}
+	}
+
+	return items, nil
+}

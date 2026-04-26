@@ -52,3 +52,28 @@ func AuthMiddleware(jwtKey []byte) func(http.Handler) http.Handler {
 		})
 	}
 }
+
+func OptionalAuthMiddleware(jwtKey []byte) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			authHeader := r.Header.Get("Authorization")
+			if authHeader != "" {
+				parts := strings.Split(authHeader, " ")
+				if len(parts) == 2 && parts[0] == "Bearer" {
+					token, err := jwt.Parse(parts[1], func(token *jwt.Token) (any, error) {
+						return jwtKey, nil
+					})
+					if err == nil && token.Valid {
+						if claims, ok := token.Claims.(jwt.MapClaims); ok {
+							if userID, ok := claims["user_id"].(float64); ok {
+								ctx := context.WithValue(r.Context(), model.UserIDKey, int64(userID))
+								r = r.WithContext(ctx)
+							}
+						}
+					}
+				}
+			}
+			next(w, r)
+		}
+	}
+}

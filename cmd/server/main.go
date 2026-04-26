@@ -60,6 +60,26 @@ func main() {
 	// Роутер
 	mux := http.NewServeMux()
 
+	// Статика
+	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
+
+	// Redirect - через /r/
+	mux.HandleFunc("GET /r/{code}", redirectHandler.RedirectToLongURL)
+
+	// Frontend страницы
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/":
+			http.ServeFile(w, r, "web/pages/index.html")
+		case "/login":
+			http.ServeFile(w, r, "web/pages/auth.html")
+		case "/cabinet":
+			http.ServeFile(w, r, "web/pages/cabinet.html")
+		default:
+			http.NotFound(w, r)
+		}
+	})
+
 	// Health check
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -74,12 +94,10 @@ func main() {
 	mux.Handle("GET /api/auth/me", authMiddleware(http.HandlerFunc(authHandler.Me)))
 
 	// Links
-	mux.Handle("POST /api/links", authMiddleware(http.HandlerFunc(linkHandler.CreateShortLink)))
+	mux.HandleFunc("POST /api/links", middleware.OptionalAuthMiddleware([]byte(cfg.JWT.Secret))(linkHandler.CreateShortLink))
 	mux.Handle("GET /api/links", authMiddleware(http.HandlerFunc(linkHandler.GetLinks)))
 	mux.Handle("DELETE /api/links/{id}", authMiddleware(http.HandlerFunc(linkHandler.DeleteLink)))
-
-	// Redirect (публичный)
-	mux.HandleFunc("GET /{code}", redirectHandler.RedirectToLongURL)
+	mux.Handle("GET /api/links/{id}/stats", authMiddleware(http.HandlerFunc(linkHandler.GetStats)))
 
 	// Сервер
 	srv := &http.Server{

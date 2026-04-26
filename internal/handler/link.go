@@ -98,3 +98,35 @@ func (h *LinkHandler) DeleteLink(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(model.MessageResponse{Message: "Ссылка удалена"})
 }
+
+func (h *LinkHandler) GetStats(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(model.UserIDKey).(int64)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Не авторизован", nil)
+		return
+	}
+
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "validation_error", "Неверный ID", nil)
+		return
+	}
+
+	stats, err := h.linkService.GetStats(r.Context(), userID, id)
+	if err != nil {
+		if strings.Contains(err.Error(), "не найдена") {
+			writeError(w, http.StatusNotFound, "not_found", err.Error(), nil)
+			return
+		}
+		if strings.Contains(err.Error(), "нет прав") {
+			writeError(w, http.StatusForbidden, "forbidden", err.Error(), nil)
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "internal_error", "Ошибка сервера", nil)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(stats)
+}

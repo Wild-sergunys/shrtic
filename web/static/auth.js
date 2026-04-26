@@ -5,15 +5,13 @@ document.addEventListener("DOMContentLoaded", function() {
   var loginForm = document.querySelector(".tab-login form");
   var registerForm = document.querySelector(".tab-register form");
 
-  // Если уже авторизован — предлагаем перейти в кабинет
-  var token = localStorage.getItem("shrtik_token");
+  var token = localStorage.getItem("shrtic_token");
   if (token) {
     confirmDialog("Вы уже авторизованы. Перейти в кабинет?", function() {
-      window.location.href = "cabinet.html";
+      window.location.href = "/cabinet";
     });
   }
 
-  // Обработчик входа
   if (loginForm) {
     loginForm.addEventListener("submit", async function(e) {
       e.preventDefault();
@@ -28,11 +26,11 @@ document.addEventListener("DOMContentLoaded", function() {
 
       try {
         var response = await API.login(login, password);
-        localStorage.setItem("shrtik_token", response.token);
-        localStorage.setItem("shrtik_login", login);
+        localStorage.setItem("shrtic_token", response.token);
+        localStorage.setItem("shrtic_login", login);
         notify("Вход выполнен! Переходим в кабинет...");
         setTimeout(function() {
-          window.location.href = "cabinet.html";
+          window.location.href = "/cabinet";
         }, 500);
       } catch (error) {
         notify(error, true);
@@ -40,7 +38,6 @@ document.addEventListener("DOMContentLoaded", function() {
     });
   }
 
-  // Обработчик регистрации
   if (registerForm) {
     registerForm.addEventListener("submit", async function(e) {
       e.preventDefault();

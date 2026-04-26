@@ -2,22 +2,19 @@ document.addEventListener("DOMContentLoaded", async function() {
   var cabinet = document.querySelector(".cabinet");
   if (!cabinet) return;
 
-  // Проверка авторизации
-  var token = localStorage.getItem("shrtik_token");
+  var token = localStorage.getItem("shrtic_token");
   if (!token) {
     notify("Вы не авторизованы! Перенаправляем на страницу входа...", true);
     setTimeout(function() {
-      window.location.href = "auth.html";
+      window.location.href = "/login";
     }, 1000);
     return;
   }
 
   var searchForm = document.querySelector(".search-form");
 
-  // Загружаем ссылки при открытии
   await loadLinks("");
 
-  // Поиск
   if (searchForm) {
     searchForm.addEventListener("submit", async function(e) {
       e.preventDefault();
@@ -26,21 +23,19 @@ document.addEventListener("DOMContentLoaded", async function() {
     });
   }
 
-  // Выход
-  var logoutLink = document.querySelector("a[href='auth.html']");
+  var logoutLink = document.querySelector("a[href='/login']");
   if (logoutLink) {
     logoutLink.addEventListener("click", function(e) {
       e.preventDefault();
-      localStorage.removeItem("shrtik_token");
-      localStorage.removeItem("shrtik_login");
+      localStorage.removeItem("shrtic_token");
+      localStorage.removeItem("shrtic_login");
       notify("Вы вышли из системы");
       setTimeout(function() {
-        window.location.href = "auth.html";
+        window.location.href = "/login";
       }, 500);
     });
   }
 
-  // Загрузка ссылок
   async function loadLinks(search) {
     try {
       var links = await API.getLinks(search);
@@ -50,15 +45,12 @@ document.addEventListener("DOMContentLoaded", async function() {
     }
   }
 
-  // Отрисовка списка
   function renderLinks(links) {
-    // Удаляем старые строки
     var oldRows = cabinet.querySelectorAll(".link-row");
     for (var i = 0; i < oldRows.length; i++) {
       oldRows[i].remove();
     }
 
-    // Пустой список
     if (links.length === 0) {
       var empty = document.createElement("p");
       empty.style.cssText = "color:var(--muted); font-style:italic;";
@@ -68,7 +60,6 @@ document.addEventListener("DOMContentLoaded", async function() {
       return;
     }
 
-    // Создаём строки
     for (var i = 0; i < links.length; i++) {
       var row = createLinkRow(links[i]);
       cabinet.appendChild(row);
@@ -77,7 +68,6 @@ document.addEventListener("DOMContentLoaded", async function() {
     updateCounters(links);
   }
 
-  // Создание строки ссылки
   function createLinkRow(link) {
     var row = document.createElement("div");
     row.className = "link-row";
@@ -86,11 +76,9 @@ document.addEventListener("DOMContentLoaded", async function() {
     var details = document.createElement("details");
     details.className = "link-details";
 
-    // Заголовок
     var summary = document.createElement("summary");
     summary.className = "link-summary";
 
-    // Короткая ссылка
     var short = document.createElement("span");
     short.className = "link-short";
     var a = document.createElement("a");
@@ -98,22 +86,18 @@ document.addEventListener("DOMContentLoaded", async function() {
     a.textContent = link.short_url;
     short.appendChild(a);
 
-    // Длинный URL
     var long = document.createElement("span");
     long.className = "link-long";
     long.textContent = link.long_url;
 
-    // Клики
     var clicks = document.createElement("span");
     clicks.className = "link-clicks";
     clicks.textContent = link.clicks;
 
-    // Дата
     var date = document.createElement("span");
     date.className = "link-date";
     date.textContent = formatDate(link.created_at);
 
-    // Кнопка удаления
     var del = document.createElement("button");
     del.textContent = "✕";
     del.style.cssText =
@@ -131,7 +115,6 @@ document.addEventListener("DOMContentLoaded", async function() {
     summary.appendChild(del);
     details.appendChild(summary);
 
-    // Статистика (ленивая загрузка)
     var statsDiv = document.createElement("div");
     statsDiv.className = "link-stats";
     statsDiv.setAttribute("data-loaded", "false");
@@ -153,7 +136,6 @@ document.addEventListener("DOMContentLoaded", async function() {
     return row;
   }
 
-  // Отрисовка статистики
   function renderStats(stats, container) {
     var html = "";
     html += createStatColumn("Браузеры", stats.browsers);
@@ -163,7 +145,6 @@ document.addEventListener("DOMContentLoaded", async function() {
     container.innerHTML = html;
   }
 
-  // Удаление ссылки
   async function deleteLink(id, rowElement) {
     confirmDialog("Удалить ссылку?", async function() {
       try {
@@ -178,7 +159,6 @@ document.addEventListener("DOMContentLoaded", async function() {
     });
   }
 
-  // Обновление счётчиков
   function updateCounters(links) {
     var totalLinks = links.length;
     var totalClicks = 0;
