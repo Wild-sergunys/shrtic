@@ -1,18 +1,18 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: shrtik_db
+    container_name: shrtic_db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER:-shrtik}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-shrtik}
-      POSTGRES_DB: ${DB_NAME:-shrtik}
+      POSTGRES_USER: ${DB_USER:-shrtic}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-shrtic}
+      POSTGRES_DB: ${DB_NAME:-shrtic}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-shrtik}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-shrtic}"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -31,16 +31,16 @@ services:
 
   app:
     build: .
-    container_name: shrtik_app
+    container_name: shrtiс_app
     restart: unless-stopped
     ports:
       - "${SERVER_PORT:-8080}:8080"
     environment:
       DB_HOST: db
       DB_PORT: 5432
-      DB_USER: ${DB_USER:-shrtik}
-      DB_PASSWORD: ${DB_PASSWORD:-shrtik}
-      DB_NAME: ${DB_NAME:-shrtik}
+      DB_USER: ${DB_USER:-shrtic}
+      DB_PASSWORD: ${DB_PASSWORD:-shrtic}
+      DB_NAME: ${DB_NAME:-shrtic}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET}

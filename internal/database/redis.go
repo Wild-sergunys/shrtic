@@ -17,9 +17,9 @@ func NewRedis(cfg *config.RedisConfig) (*redis.Client, error) {
 	})
 
 	if err := client.Ping(context.Background()).Err(); err != nil {
-		return nil, fmt.Errorf("failed to ping redis: %w", err)
+		return nil, fmt.Errorf("не удалось подключиться к Redis: %w", err)
 	}
 
-	log.Println("Redis connected")
+	log.Println("Подключено к Redis")
 	return client, nil
 }

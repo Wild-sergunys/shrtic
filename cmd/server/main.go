@@ -10,20 +10,24 @@ import (
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		log.Fatalf("Ошибка загрузки конфига: %v", err)
 	}
 
 	db, err := database.NewPostgres(&cfg.DB)
 	if err != nil {
-		log.Fatalf("Failed to connect to PostgreSQL: %v", err)
+		log.Fatalf("Ошибка подключения к PostgreSQL: %v", err)
 	}
 	defer db.Close()
 
+	if err := database.RunMigrations(cfg.DB.MigrateDSN()); err != nil {
+		log.Fatalf("Ошибка миграций: %v", err)
+	}
+
 	redisClient, err := database.NewRedis(&cfg.Redis)
 	if err != nil {
-		log.Fatalf("Failed to connect to Redis: %v", err)
+		log.Fatalf("Ошибка подключения к Redis: %v", err)
 	}
 	defer redisClient.Close()
 
-	log.Println("All services connected successfully")
+	log.Println("Все сервисы запущены")
 }

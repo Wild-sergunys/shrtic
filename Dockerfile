@@ -16,11 +16,11 @@ RUN apk --no-cache add ca-certificates
 
 WORKDIR /root/
 
-COPY --from=builder /shrtik .
+COPY --from=builder /shrtic .
 COPY --from=builder /app/migrations ./migrations
 
 # Не копируем .env в образ - будет через volumes или env vars
 
 EXPOSE 8080
 
-CMD ["./shrtik"]
+CMD ["./shrtic"]

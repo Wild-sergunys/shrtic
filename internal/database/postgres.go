@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/Wild-sergunys/shrtic/internal/config"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/Wild-sergunys/shrtic/internal/config"
 )
 
 func NewPostgres(cfg *config.DBConfig) (*pgxpool.Pool, error) {
@@ -17,13 +18,13 @@ func NewPostgres(cfg *config.DBConfig) (*pgxpool.Pool, error) {
 
 	pool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to postgres: %w", err)
+		return nil, fmt.Errorf("не удалось подключиться к PostgreSQL: %w", err)
 	}
 
 	if err := pool.Ping(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed to ping postgres: %w", err)
+		return nil, fmt.Errorf("не удалось проверить соединение с PostgreSQL: %w", err)
 	}
 
-	log.Println("PostgreSQL connected")
+	log.Println("Подключено к PostgreSQL")
 	return pool, nil
 }

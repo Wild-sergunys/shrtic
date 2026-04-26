@@ -41,9 +41,9 @@ func Load() (*Config, error) {
 		DB: DBConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
 			Port:     getEnvInt("DB_PORT", 5432),
-			User:     getEnv("DB_USER", "shrtik"),
-			Password: getEnv("DB_PASSWORD", "shrtik"),
-			DBName:   getEnv("DB_NAME", "shrtik"),
+			User:     getEnv("DB_USER", "shrtic"),
+			Password: getEnv("DB_PASSWORD", "shrtic"),
+			DBName:   getEnv("DB_NAME", "shrtic"),
 		},
 		Redis: RedisConfig{
 			Host: getEnv("REDIS_HOST", "localhost"),
@@ -69,6 +69,13 @@ func (c *DBConfig) DSN() string {
 	return fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 		c.Host, c.Port, c.User, c.Password, c.DBName,
+	)
+}
+
+func (c *DBConfig) MigrateDSN() string {
+	return fmt.Sprintf(
+		"postgres://%s:%s@%s:%d/%s?sslmode=disable",
+		c.User, c.Password, c.Host, c.Port, c.DBName,
 	)
 }
 
