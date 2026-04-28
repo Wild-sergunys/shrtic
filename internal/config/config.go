@@ -8,10 +8,13 @@ import (
 )
 
 type Config struct {
-	DB     DBConfig
-	Redis  RedisConfig
-	JWT    JWTConfig
-	Server ServerConfig
+	DB               DBConfig
+	Redis            RedisConfig
+	JWT              JWTConfig
+	Server           ServerConfig
+	LoginMaxAttempts int
+	LoginWindowMin   int
+	LoginBlockMin    int
 }
 
 type DBConfig struct {
@@ -56,6 +59,9 @@ func Load() (*Config, error) {
 		Server: ServerConfig{
 			Port: getEnvInt("SERVER_PORT", 8080),
 		},
+		LoginMaxAttempts: getEnvInt("LOGIN_MAX_ATTEMPTS", 5),
+		LoginWindowMin:   getEnvInt("LOGIN_WINDOW_MINUTES", 15),
+		LoginBlockMin:    getEnvInt("LOGIN_BLOCK_MINUTES", 15),
 	}
 
 	if cfg.JWT.Secret == "" {

@@ -30,7 +30,6 @@ func main() {
 	}
 	defer db.Close()
 
-	// Миграции
 	if err := database.RunMigrations(cfg.DB.MigrateDSN()); err != nil {
 		log.Fatalf("Ошибка миграций: %v", err)
 	}
@@ -40,6 +39,15 @@ func main() {
 		log.Fatalf("Ошибка подключения к Redis: %v", err)
 	}
 	defer redisClient.Close()
+
+	// Rate limiter для логина
+	loginLimiter := middleware.NewRateLimiter(
+		cfg.LoginMaxAttempts,
+		time.Duration(cfg.LoginWindowMin)*time.Minute,
+		time.Duration(cfg.LoginBlockMin)*time.Minute,
+	)
+	handler.SetLoginRateLimiter(loginLimiter)
+	loginRateLimitMiddleware := middleware.LoginRateLimitMiddleware(loginLimiter)
 
 	// Репозитории
 	userRepo := repository.NewUserRepository(db)
@@ -63,7 +71,7 @@ func main() {
 	// Статика
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
 
-	// Redirect - через /r/
+	// Redirect — через /r/
 	mux.HandleFunc("GET /r/{code}", redirectHandler.RedirectToLongURL)
 
 	// Frontend страницы
@@ -89,7 +97,7 @@ func main() {
 
 	// Auth
 	mux.HandleFunc("POST /api/auth/register", authHandler.Register)
-	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
+	mux.Handle("POST /api/auth/login", loginRateLimitMiddleware(http.HandlerFunc(authHandler.Login)))
 	mux.Handle("POST /api/auth/logout", authMiddleware(http.HandlerFunc(authHandler.Logout)))
 	mux.Handle("GET /api/auth/me", authMiddleware(http.HandlerFunc(authHandler.Me)))
 

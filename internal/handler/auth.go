@@ -5,9 +5,16 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Wild-sergunys/shrtic/internal/middleware"
 	"github.com/Wild-sergunys/shrtic/internal/model"
 	"github.com/Wild-sergunys/shrtic/internal/service"
 )
+
+var loginRateLimiter *middleware.RateLimiter
+
+func SetLoginRateLimiter(rl *middleware.RateLimiter) {
+	loginRateLimiter = rl
+}
 
 type AuthHandler struct {
 	authService *service.AuthService
@@ -69,6 +76,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		}
 		writeError(w, http.StatusInternalServerError, "internal_error", "Внутренняя ошибка сервера", nil)
 		return
+	}
+
+	if loginRateLimiter != nil {
+		loginRateLimiter.Reset(middleware.GetIP(r))
 	}
 
 	w.Header().Set("Content-Type", "application/json")
