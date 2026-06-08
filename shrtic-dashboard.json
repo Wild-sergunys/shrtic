@@ -1,0 +1,82 @@
+{
+  "dashboard": {
+    "title": "SHRTIC Metrics",
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "RPS",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0},
+        "targets": [{"expr": "rate(http_requests_total[5m])"}]
+      },
+      {
+        "title": "Время ответа",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0},
+        "targets": [{"expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))"}]
+      },
+      {
+        "title": "Активные ссылки",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
+        "targets": [{"expr": "active_links_total"}],
+        "options": {
+          "reduceOptions": {
+            "calcs": ["last"]
+          }
+        }
+      },
+      {
+        "title": "Всего переходов",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 20, "y": 0},
+        "targets": [{"expr": "total_clicks_all_time"}],
+        "options": {
+          "reduceOptions": {
+            "calcs": ["last"]
+          }
+        }
+      },
+      {
+        "title": "Пользователи",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 16, "y": 4},
+        "targets": [{"expr": "active_users_total"}],
+        "options": {
+          "reduceOptions": {
+            "calcs": ["last"]
+          }
+        }
+      },
+      {
+        "title": "Попытки входа",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 20, "y": 4},
+        "targets": [{"expr": "login_attempts_total"}],
+        "options": {
+          "reduceOptions": {
+            "calcs": ["last"]
+          }
+        }
+      },
+      {
+        "title": "Память (MB)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 8},
+        "targets": [{"expr": "go_memstats_alloc_bytes / 1024 / 1024"}]
+      },
+      {
+        "title": "Горутины",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 8},
+        "targets": [{"expr": "go_goroutines"}]
+      },
+      {
+        "title": "CPU время",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 8},
+        "targets": [{"expr": "rate(process_cpu_seconds_total[5m])"}]
+      }
+    ]
+  }
+}

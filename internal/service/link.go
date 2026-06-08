@@ -57,9 +57,24 @@ func (s *LinkService) CreateShortLink(ctx context.Context, longURL string, userI
 		longURL = "https://" + longURL
 	}
 
-	code, err := generateShortCode()
-	if err != nil {
-		return nil, fmt.Errorf("ошибка генерации кода: %w", err)
+	maxAttempts := 5
+	var code string
+	var err error
+
+	for i := 0; i < maxAttempts; i++ {
+		code, err = generateShortCode()
+		if err != nil {
+			continue
+		}
+
+		existing, _ := s.linkRepo.FindByShortCode(ctx, "/r/"+code)
+		if existing == nil {
+			break
+		}
+
+		if i == maxAttempts-1 {
+			return nil, fmt.Errorf("не удалось сгенерировать уникальный код")
+		}
 	}
 
 	link := &model.Link{
@@ -72,7 +87,7 @@ func (s *LinkService) CreateShortLink(ctx context.Context, longURL string, userI
 		return nil, fmt.Errorf("ошибка создания ссылки: %w", err)
 	}
 
-	if err := s.redis.Set(ctx, "/r/"+code, longURL, cacheTTL).Err(); err != nil {
+	if err := s.redis.Set(ctx, code, longURL, cacheTTL).Err(); err != nil {
 		return nil, fmt.Errorf("ошибка кэширования: %w", err)
 	}
 
@@ -80,7 +95,9 @@ func (s *LinkService) CreateShortLink(ctx context.Context, longURL string, userI
 }
 
 func (s *LinkService) GetLongURL(ctx context.Context, code string) (string, error) {
-	longURL, err := s.redis.Get(ctx, code).Result()
+	cleanCode := strings.TrimPrefix(code, "/r/")
+
+	longURL, err := s.redis.Get(ctx, cleanCode).Result()
 	if err == nil {
 		return longURL, nil
 	}
@@ -93,7 +110,7 @@ func (s *LinkService) GetLongURL(ctx context.Context, code string) (string, erro
 		return "", fmt.Errorf("ссылка не найдена")
 	}
 
-	s.redis.Set(ctx, code, link.LongURL, cacheTTL)
+	s.redis.Set(ctx, cleanCode, link.LongURL, cacheTTL)
 
 	return link.LongURL, nil
 }
@@ -129,7 +146,8 @@ func (s *LinkService) DeleteLink(ctx context.Context, userID int64, linkID int64
 		return fmt.Errorf("ошибка удаления ссылки: %w", err)
 	}
 
-	s.redis.Del(ctx, link.ShortURL)
+	cleanCode := strings.TrimPrefix(link.ShortURL, "/r/")
+	s.redis.Del(ctx, cleanCode)
 
 	return nil
 }
@@ -163,8 +181,8 @@ func (s *LinkService) GetStats(ctx context.Context, userID int64, linkID int64) 
 }
 
 func getCountry(ip string) string {
-	if ip == "" || ip == "127.0.0.1" || ip == "::1" {
-		return "localhost"
+	if ip == "" || ip == "127.0.0.1" || ip == "::1" || ip == "localhost" {
+		return "Локальный"
 	}
 
 	url := fmt.Sprintf("http://ip-api.com/json/%s?fields=country", ip)
@@ -198,10 +216,12 @@ func parseUserAgent(ua string) (browser, device string) {
 	switch {
 	case strings.Contains(ua, "firefox"):
 		browser = "Firefox"
-	case strings.Contains(ua, "safari"):
+	case strings.Contains(ua, "safari") && !strings.Contains(ua, "chrome"):
 		browser = "Safari"
 	case strings.Contains(ua, "chrome"):
 		browser = "Chrome"
+	case strings.Contains(ua, "edge"):
+		browser = "Edge"
 	default:
 		browser = "Other"
 	}
@@ -227,9 +247,9 @@ func parseReferer(referer string) string {
 	switch {
 	case strings.Contains(referer, "twitter.com") || strings.Contains(referer, "x.com"):
 		return "Twitter"
-	case strings.Contains(referer, "t.me"):
+	case strings.Contains(referer, "t.me") || strings.Contains(referer, "telegram"):
 		return "Telegram"
-	case strings.Contains(referer, "facebook.com"):
+	case strings.Contains(referer, "facebook.com") || strings.Contains(referer, "fb.com"):
 		return "Facebook"
 	case strings.Contains(referer, "instagram.com"):
 		return "Instagram"
@@ -241,6 +261,8 @@ func parseReferer(referer string) string {
 		return "LinkedIn"
 	case strings.Contains(referer, "google.com") || strings.Contains(referer, "google.ru"):
 		return "Google"
+	case strings.Contains(referer, "yandex.ru"):
+		return "Yandex"
 	default:
 		return "Other"
 	}

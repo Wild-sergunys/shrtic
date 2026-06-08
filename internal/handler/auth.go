@@ -41,7 +41,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.authService.Register(r.Context(), req.Login, req.Password)
+	_, err := h.authService.Register(r.Context(), req.Login, req.Password)
 	if err != nil {
 		if strings.Contains(err.Error(), "уже существует") {
 			writeError(w, http.StatusConflict, "conflict", err.Error(), nil)
@@ -53,7 +53,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(model.IdResponse{ID: user.ID})
+	json.NewEncoder(w).Encode(model.IdResponse{ID: 0})
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -71,6 +71,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	token, err := h.authService.Login(r.Context(), req.Login, req.Password)
 	if err != nil {
 		if err == service.ErrInvalidCredentials {
+			middleware.RecordLoginAttempt(false)
 			writeError(w, http.StatusUnauthorized, "invalid_credentials", err.Error(), nil)
 			return
 		}
@@ -78,14 +79,25 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	middleware.RecordLoginAttempt(true)
+
 	if loginRateLimiter != nil {
 		loginRateLimiter.Reset(middleware.GetIP(r))
 	}
 
+	http.SetCookie(w, &http.Cookie{
+		Name:     "shrtic_token",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   86400,
+	})
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(model.LoginResponse{
-		Token: token,
-		Role:  "user",
+		Role: "user",
 	})
 }
 
@@ -107,6 +119,15 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "shrtic_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false,
+		MaxAge:   -1,
+	})
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(model.MessageResponse{Message: "Выход выполнен успешно"})
 }

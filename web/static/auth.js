@@ -5,13 +5,6 @@ document.addEventListener("DOMContentLoaded", function() {
   var loginForm = document.querySelector(".tab-login form");
   var registerForm = document.querySelector(".tab-register form");
 
-  var token = localStorage.getItem("shrtic_token");
-  if (token) {
-    confirmDialog("Вы уже авторизованы. Перейти в кабинет?", function() {
-      window.location.href = "/cabinet";
-    });
-  }
-
   if (loginForm) {
     loginForm.addEventListener("submit", async function(e) {
       e.preventDefault();
@@ -25,9 +18,7 @@ document.addEventListener("DOMContentLoaded", function() {
       }
 
       try {
-        var response = await API.login(login, password);
-        localStorage.setItem("shrtic_token", response.token);
-        localStorage.setItem("shrtic_login", login);
+        await API.login(login, password);
         notify("Вход выполнен! Переходим в кабинет...");
         setTimeout(function() {
           window.location.href = "/cabinet";

@@ -1,12 +1,10 @@
 package handler
 
 import (
-	"context"
-	"net"
 	"net/http"
 	"regexp"
-	"strings"
 
+	"github.com/Wild-sergunys/shrtic/internal/middleware"
 	"github.com/Wild-sergunys/shrtic/internal/service"
 )
 
@@ -34,29 +32,13 @@ func (h *RedirectHandler) RedirectToLongURL(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	go func() {
-		link, err := h.linkService.GetLinkByCode(context.Background(), code)
-		if err == nil && link != nil {
-			h.linkService.RecordClick(context.Background(), link.ID)
-			clientIP := getIP(r)
-			h.linkService.SaveClickStats(context.Background(), link.ID, r.UserAgent(), r.Referer(), clientIP)
-		}
-	}()
+	link, err := h.linkService.GetLinkByCode(r.Context(), code)
+	if err == nil && link != nil {
+		h.linkService.RecordClick(r.Context(), link.ID)
+		middleware.RecordClick()
+		clientIP := middleware.GetIP(r)
+		h.linkService.SaveClickStats(r.Context(), link.ID, r.UserAgent(), r.Referer(), clientIP)
+	}
 
 	http.Redirect(w, r, longURL, http.StatusFound)
-}
-
-func getIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		ip := strings.Split(xff, ",")[0]
-		return strings.TrimSpace(ip)
-	}
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return strings.TrimSpace(xri)
-	}
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return ip
 }

@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/Wild-sergunys/shrtic/internal/config"
 	"github.com/Wild-sergunys/shrtic/internal/database"
 	"github.com/Wild-sergunys/shrtic/internal/handler"
@@ -40,7 +42,6 @@ func main() {
 	}
 	defer redisClient.Close()
 
-	// Rate limiter для логина
 	loginLimiter := middleware.NewRateLimiter(
 		cfg.LoginMaxAttempts,
 		time.Duration(cfg.LoginWindowMin)*time.Minute,
@@ -49,32 +50,24 @@ func main() {
 	handler.SetLoginRateLimiter(loginLimiter)
 	loginRateLimitMiddleware := middleware.LoginRateLimitMiddleware(loginLimiter)
 
-	// Репозитории
 	userRepo := repository.NewUserRepository(db)
 	linkRepo := repository.NewLinkRepository(db)
 
-	// Сервисы
 	authService := service.NewAuthService(userRepo, cfg.JWT.Secret, cfg.JWT.TTL)
 	linkService := service.NewLinkService(linkRepo, redisClient)
 
-	// Хендлеры
 	authHandler := handler.NewAuthHandler(authService)
 	linkHandler := handler.NewLinkHandler(linkService)
 	redirectHandler := handler.NewRedirectHandler(linkService)
 
-	// Middleware
 	authMiddleware := middleware.AuthMiddleware([]byte(cfg.JWT.Secret))
 
-	// Роутер
 	mux := http.NewServeMux()
 
-	// Статика
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
 
-	// Redirect — через /r/
 	mux.HandleFunc("GET /r/{code}", redirectHandler.RedirectToLongURL)
 
-	// Frontend страницы
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/":
@@ -88,39 +81,59 @@ func main() {
 		}
 	})
 
-	// Health check
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// Auth
+	mux.Handle("GET /metrics", promhttp.Handler())
+
 	mux.HandleFunc("POST /api/auth/register", authHandler.Register)
 	mux.Handle("POST /api/auth/login", loginRateLimitMiddleware(http.HandlerFunc(authHandler.Login)))
 	mux.Handle("POST /api/auth/logout", authMiddleware(http.HandlerFunc(authHandler.Logout)))
 	mux.Handle("GET /api/auth/me", authMiddleware(http.HandlerFunc(authHandler.Me)))
 
-	// Links
 	mux.HandleFunc("POST /api/links", middleware.OptionalAuthMiddleware([]byte(cfg.JWT.Secret))(linkHandler.CreateShortLink))
 	mux.Handle("GET /api/links", authMiddleware(http.HandlerFunc(linkHandler.GetLinks)))
 	mux.Handle("DELETE /api/links/{id}", authMiddleware(http.HandlerFunc(linkHandler.DeleteLink)))
 	mux.Handle("GET /api/links/{id}/stats", authMiddleware(http.HandlerFunc(linkHandler.GetStats)))
 
-	// Сервер
+	handlerWithMetrics := middleware.MetricsMiddleware(mux)
+
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),
-		Handler:      mux,
+		Handler:      handlerWithMetrics,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
+
+	go func() {
+		users, _ := userRepo.Count(context.Background())
+		middleware.SetActiveUsers(int64(users))
+
+		links, _ := linkRepo.Count(context.Background())
+		middleware.SetActiveLinks(int64(links))
+
+		ticker := time.NewTicker(5 * time.Minute)
+		go func() {
+			for range ticker.C {
+				users, _ := userRepo.Count(context.Background())
+				middleware.SetActiveUsers(int64(users))
+				links, _ := linkRepo.Count(context.Background())
+				middleware.SetActiveLinks(int64(links))
+			}
+		}()
+	}()
 
 	stop := make(chan os.Signal, 2)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
 		log.Printf("Сервер запущен на http://localhost%s", srv.Addr)
+		log.Printf("Prometheus метрики: http://localhost%s/metrics", srv.Addr)
+		log.Printf("Grafana: http://localhost:3000 (admin/admin)")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Ошибка запуска сервера: %v", err)
 		}

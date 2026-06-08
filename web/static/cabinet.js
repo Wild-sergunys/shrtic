@@ -2,16 +2,17 @@ document.addEventListener("DOMContentLoaded", async function() {
   var cabinet = document.querySelector(".cabinet");
   if (!cabinet) return;
 
-  var token = localStorage.getItem("shrtic_token");
-  if (!token) {
+  var searchForm = document.querySelector(".search-form");
+
+  try {
+    await API.me();
+  } catch (error) {
     notify("Вы не авторизованы! Перенаправляем на страницу входа...", true);
     setTimeout(function() {
       window.location.href = "/login";
     }, 1000);
     return;
   }
-
-  var searchForm = document.querySelector(".search-form");
 
   await loadLinks("");
 
@@ -25,10 +26,9 @@ document.addEventListener("DOMContentLoaded", async function() {
 
   var logoutLink = document.querySelector("a[href='/login']");
   if (logoutLink) {
-    logoutLink.addEventListener("click", function(e) {
+    logoutLink.addEventListener("click", async function(e) {
       e.preventDefault();
-      localStorage.removeItem("shrtic_token");
-      localStorage.removeItem("shrtic_login");
+      await API.logout();
       notify("Вы вышли из системы");
       setTimeout(function() {
         window.location.href = "/login";
@@ -37,6 +37,7 @@ document.addEventListener("DOMContentLoaded", async function() {
   }
 
   async function loadLinks(search) {
+    if (search === undefined || search === null) search = "";
     try {
       var links = await API.getLinks(search);
       renderLinks(links);
@@ -51,8 +52,12 @@ document.addEventListener("DOMContentLoaded", async function() {
       oldRows[i].remove();
     }
 
+    var oldEmpty = cabinet.querySelector(".empty-links-message");
+    if (oldEmpty) oldEmpty.remove();
+
     if (links.length === 0) {
       var empty = document.createElement("p");
+      empty.className = "empty-links-message";
       empty.style.cssText = "color:var(--muted); font-style:italic;";
       empty.textContent = "// ссылок пока нет. Создайте первую на главной!";
       cabinet.appendChild(empty);
@@ -79,16 +84,50 @@ document.addEventListener("DOMContentLoaded", async function() {
     var summary = document.createElement("summary");
     summary.className = "link-summary";
 
-    var short = document.createElement("span");
-    short.className = "link-short";
+    var shortContainer = document.createElement("span");
+    shortContainer.className = "link-short";
+    shortContainer.style.display = "flex";
+    shortContainer.style.alignItems = "center";
+    shortContainer.style.gap = "8px";
+    shortContainer.style.flexWrap = "wrap";
+
     var a = document.createElement("a");
-    a.href = link.short_url;
+    var fullShortUrl = window.location.protocol + "//" + window.location.host + link.short_url;
+    a.href = fullShortUrl;
     a.textContent = link.short_url;
-    short.appendChild(a);
+    a.style.textDecoration = "none";
+    a.style.color = "var(--accent)";
+    a.style.borderBottom = "2px solid var(--accent)";
+    a.target = "_blank";
+    
+    var copyBtn = document.createElement("button");
+    copyBtn.textContent = "Скопировать";
+    copyBtn.style.cssText = 
+      "background:none; border:1px solid var(--muted); cursor:pointer;" +
+      "font-size:0.7rem; padding:2px 6px; border-radius:0;" +
+      "font-family:var(--font); transition:0.1s;";
+    copyBtn.title = "Копировать ссылку";
+    copyBtn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      navigator.clipboard.writeText(fullShortUrl).then(function() {
+        var originalText = copyBtn.textContent;
+        copyBtn.textContent = "✓";
+        setTimeout(function() {
+          copyBtn.textContent = originalText;
+        }, 1500);
+        notify("Ссылка скопирована!");
+      }).catch(function() {
+        notify("Не удалось скопировать", true);
+      });
+    });
+    
+    shortContainer.appendChild(a);
+    shortContainer.appendChild(copyBtn);
 
     var long = document.createElement("span");
     long.className = "link-long";
     long.textContent = link.long_url;
+    long.title = link.long_url;
 
     var clicks = document.createElement("span");
     clicks.className = "link-clicks";
@@ -108,7 +147,7 @@ document.addEventListener("DOMContentLoaded", async function() {
       deleteLink(link.id, row);
     });
 
-    summary.appendChild(short);
+    summary.appendChild(shortContainer);
     summary.appendChild(long);
     summary.appendChild(clicks);
     summary.appendChild(date);
@@ -137,6 +176,10 @@ document.addEventListener("DOMContentLoaded", async function() {
   }
 
   function renderStats(stats, container) {
+    if (!stats) {
+      container.innerHTML = "<p style='color:var(--muted);'>Нет данных для отображения</p>";
+      return;
+    }
     var html = "";
     html += createStatColumn("Браузеры", stats.browsers);
     html += createStatColumn("Устройства", stats.devices);

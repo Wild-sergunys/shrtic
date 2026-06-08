@@ -4,24 +4,27 @@
 
 ## Быстрый старт
 
-    git clone https://github.com/Wild-sergunys/shrtic.git
-    cd shrtic
-    cp .env.example .env
-    docker compose up -d
+```bash
+git clone https://github.com/Wild-sergunys/shrtic.git
+cd shrtic
+cp .env.example .env
+docker compose up -d
+```
 
-Сервер запустится на http://localhost:8080.
+Сервер запустится на `http://localhost:8080`.
 
 ## Аутентификация
 
-Используются JWT токены. После успешного входа сервер возвращает токен, который клиент передаёт в заголовке Authorization: Bearer <token>.
+Используются JWT токены. После успешного входа сервер устанавливает cookie `shrtic_token` (HttpOnly, MaxAge=86400).
 
-Токен действителен 24 часа.
+Также токен принимается в заголовке `Authorization: Bearer <token>`.
 
-Ответ при успешном входе:
+**Ответ при успешном входе:**
+```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIs...",
   "role": "user"
 }
+```
 
 ## Эндпоинты
 
@@ -29,25 +32,32 @@
 
 | Метод | URL | Описание |
 |-------|-----|----------|
-| POST | /api/auth/register | Регистрация |
-| POST | /api/auth/login | Вход в систему |
-| POST | /api/auth/logout | Выход |
-| GET | /api/auth/me | Информация о текущем пользователе |
+| POST | `/api/auth/register` | Регистрация |
+| POST | `/api/auth/login` | Вход в систему |
+| POST | `/api/auth/logout` | Выход |
+| GET | `/api/auth/me` | Информация о текущем пользователе |
 
 ### Ссылки
 
 | Метод | URL | Описание |
 |-------|-----|----------|
-| POST | /api/links | Создать короткую ссылку (можно без авторизации) |
-| GET | /api/links | Список ссылок пользователя (с поиском ?search=) |
-| DELETE | /api/links/{id} | Удалить ссылку |
-| GET | /api/links/{id}/stats | Статистика по ссылке |
+| POST | `/api/links` | Создать короткую ссылку (можно без авторизации) |
+| GET | `/api/links` | Список ссылок пользователя (с поиском `?search=`) |
+| DELETE | `/api/links/{id}` | Удалить ссылку |
+| GET | `/api/links/{id}/stats` | Статистика по ссылке |
 
 ### Редирект (публичный)
 
 | Метод | URL | Описание |
 |-------|-----|----------|
-| GET | /r/{code} | Переход по короткой ссылке (302) |
+| GET | `/r/{code}` | Переход по короткой ссылке (302) |
+
+### Мониторинг
+
+| Метод | URL | Описание |
+|-------|-----|----------|
+| GET | `/health` | Health check |
+| GET | `/metrics` | Prometheus метрики |
 
 ## Коды ответов
 
@@ -66,4 +76,4 @@
 
 ## OpenAPI спецификация
 
-Полная спецификация в формате OpenAPI 3.0 доступна в файле openapi.yaml.
+Полная спецификация в формате OpenAPI 3.0 доступна в файле `openapi.yaml`.

@@ -1,4 +1,3 @@
--- 20260426002_create_links.up.sql
 CREATE TABLE IF NOT EXISTS links (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,

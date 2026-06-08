@@ -3,14 +3,11 @@ var API = {
 
   _request: async function(method, path, body) {
     var headers = { 'Content-Type': 'application/json' };
-    var token = window.localStorage.getItem('shrtic_token');
-    if (token) {
-      headers['Authorization'] = 'Bearer ' + token;
-    }
 
     var options = {
       method: method,
-      headers: headers
+      headers: headers,
+      credentials: 'include'
     };
     if (body) {
       options.body = JSON.stringify(body);

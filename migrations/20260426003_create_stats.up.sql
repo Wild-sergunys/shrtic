@@ -1,4 +1,3 @@
--- 20260426003_create_stats.up.sql
 CREATE TABLE IF NOT EXISTS stats (
     id SERIAL PRIMARY KEY,
     link_id INTEGER NOT NULL REFERENCES links(id) ON DELETE CASCADE,

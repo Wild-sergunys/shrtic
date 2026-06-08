@@ -9,14 +9,12 @@ import (
 	"time"
 )
 
-// LoginAttempt хранит информацию о попытках входа с одного IP
 type LoginAttempt struct {
 	Count        int
 	FirstTry     time.Time
 	BlockedUntil time.Time
 }
 
-// RateLimiter отслеживает попытки входа
 type RateLimiter struct {
 	mu          sync.RWMutex
 	attempts    map[string]*LoginAttempt
@@ -37,7 +35,6 @@ func NewRateLimiter(maxAttempts int, window, blockTime time.Duration) *RateLimit
 	return rl
 }
 
-// cleanup периодически удаляет устаревшие записи
 func (rl *RateLimiter) cleanup() {
 	interval := rl.window
 	if interval < time.Minute {
@@ -68,7 +65,6 @@ func (rl *RateLimiter) cleanup() {
 	}
 }
 
-// Allow проверяет, можно ли попытаться войти с этого IP
 func (rl *RateLimiter) Allow(ip string) (bool, time.Duration) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
@@ -111,14 +107,23 @@ func (rl *RateLimiter) Allow(ip string) (bool, time.Duration) {
 	return true, 0
 }
 
-// Reset сбрасывает счётчик попыток для IP
 func (rl *RateLimiter) Reset(ip string) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 	delete(rl.attempts, ip)
 }
 
-// GetIP получает IP клиента из запроса
+func (rl *RateLimiter) IsBlocked(ip string) bool {
+	rl.mu.RLock()
+	defer rl.mu.RUnlock()
+
+	attempt, exists := rl.attempts[ip]
+	if !exists {
+		return false
+	}
+	return time.Now().Before(attempt.BlockedUntil)
+}
+
 func GetIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		ips := strings.Split(xff, ",")
@@ -139,7 +144,6 @@ func GetIP(r *http.Request) string {
 	return ip
 }
 
-// LoginRateLimitMiddleware ограничивает попытки входа
 func LoginRateLimitMiddleware(rl *RateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

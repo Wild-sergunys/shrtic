@@ -179,3 +179,12 @@ func (r *LinkRepository) getGroupedStats(ctx context.Context, linkID int64, fiel
 
 	return items, nil
 }
+
+func (r *LinkRepository) Count(ctx context.Context) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM links`).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("не удалось получить количество ссылок: %w", err)
+	}
+	return count, nil
+}

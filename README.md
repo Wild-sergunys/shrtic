@@ -11,6 +11,7 @@
 git clone https://github.com/Wild-sergunys/shrtic.git
 cd shrtic
 cp .env.example .env
+# Обязательно измените JWT_SECRET в .env!
 docker compose up -d
 ```
 
@@ -24,6 +25,7 @@ docker compose up -d
 | База данных | PostgreSQL 16 |
 | Кэш | Redis 7 |
 | Фронтенд | Чистый HTML/CSS/JS |
+| Мониторинг | Prometheus + Grafana |
 | Деплой | Docker, Docker Compose |
 
 ## ВОЗМОЖНОСТИ
@@ -31,59 +33,89 @@ docker compose up -d
 - Сокращение ссылок: генерация коротких кодов (base62, 7 символов)
 - Редирект с кэшированием в Redis (TTL 24h) - быстрый переход без запроса к БД
 - Сбор статистики переходов: браузеры, устройства, страны, источники перехода
-- Страна определяется по IP через ip-api.com
-- Optional JWT-авторизация: незалогиненные создают ссылки, залогиненные видят статистику
-- Личный кабинет со списком ссылок, поиском и удалением
+- Страна определяется по IP через ip-api.com (на localhost: "Локальный")
+- JWT-авторизация через cookie или Bearer токен
+- Личный кабинет со списком ссылок, поиском и статистикой
+- Rate limiter на попытки входа (5 попыток за 15 минут, блокировка 15 минут)
 - Graceful shutdown сервера
 - Автоматический прогон миграций при старте
-- Rate limiter на попытки входа (защита от брутфорса)
+- Prometheus метрики (RPS, latency, активные ссылки, пользователи)
+
+## АУТЕНТИФИКАЦИЯ
+
+После успешного входа JWT токен устанавливается в cookie `shrtic_token` (HttpOnly, 24 часа).
+Также токен принимается в заголовке `Authorization: Bearer <token>`.
+
+Ответ при входе:
+```json
+{
+  "role": "user"
+}
+```
 
 ## ДОКУМЕНТАЦИЯ API
 
 - [OpenAPI спецификация](api/openapi.yaml)
+- [Форматы запросов и ошибок](api/FORMATS.md)
+- [Сбор статистики](api/STATS.md)
+- [Визуализация данных](api/VISUALIZATION.md)
 
 ## АРХИТЕКТУРА
 
 ```
 .
-├── api/                    # OpenAPI спецификация
+├── api/                    # Документация API
 ├── cmd/server/             # Точка входа
 ├── internal/
 │   ├── config/             # Загрузка конфигурации из .env
-│   ├── database/           # Подключение к PostgreSQL и Redis, миграции
-│   ├── handler/            # HTTP-обработчики (auth, links, redirect)
-│   ├── middleware/         # JWT-авторизация (обычная + опциональная), rate limiter
+│   ├── database/           # PostgreSQL, Redis, миграции
+│   ├── handler/            # HTTP-обработчики
+│   ├── middleware/         # JWT, rate limiter, метрики
 │   ├── model/              # Структуры данных
-│   ├── repository/         # Доступ к БД (PostgreSQL)
-│   └── service/            # Бизнес-логика (auth, ссылки, статистика)
-├── migrations/             # SQL-миграции (PostgreSQL)
-└── web/                    # Фронтенд (HTML/CSS/JS)
-    ├── pages/              # HTML-страницы
-    └── static/             # CSS, JavaScript
+│   ├── repository/         # Доступ к БД
+│   └── service/            # Бизнес-логика
+├── migrations/             # SQL-миграции
+├── web/                    # Фронтенд
+│   ├── pages/              # HTML страницы
+│   └── static/             # CSS, JS
+├── prometheus.yml
+├── shrtic-dashboard.json
+└── docker-compose.yml
 ```
 
-Слои: `handler → service → repository`. Handler принимает HTTP-запросы, service содержит бизнес-логику, repository работает с БД.
+Слои: `handler → service → repository`.
 
 ## СТАТИСТИКА ПЕРЕХОДОВ
 
-При каждом переходе по короткой ссылке автоматически собирается:
+При каждом переходе по короткой ссылке **синхронно** собирается:
 
-- **Браузер:** Chrome, Firefox, Safari, Other (парсинг User-Agent)
+- **Браузер:** Chrome, Firefox, Safari, Edge, Other (парсинг User-Agent)
 - **Устройство:** Desktop, Mobile, Tablet (парсинг User-Agent)
-- **Страна:** определяется по IP через ip-api.com (на localhost: `localhost`)
-- **Источник:** Прямой, Twitter, Telegram, Facebook, Google и др. (заголовок Referer)
+- **Страна:** определяется по IP через ip-api.com (на localhost: "Локальный")
+- **Источник:** Прямой, Twitter, Telegram, Facebook, Google, Yandex, Other (заголовок Referer)
 
 Статистика доступна в личном кабинете при раскрытии карточки ссылки.
 
+## МОНИТОРИНГ
+
+- Prometheus: http://localhost:9090
+- Grafana: http://localhost:3000 (admin/admin)
+
+Импорт дашборда:
+```bash
+curl -X POST http://localhost:3000/api/dashboards/db \
+  -H "Content-Type: application/json" \
+  -u admin:admin \
+  -d @shrtic-dashboard.json
+```
+
 ## ТЕСТЫ
 
-Юнит-тесты покрывают:
-TODO: НАПИСАТЬ ТЕСТЫ
-
 ```bash
-go test ./internal/... ./web/ -v
+go test ./internal/... -v
 ```
 
 ## ЛИЦЕНЗИЯ
 
 MIT
+

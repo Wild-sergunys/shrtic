@@ -1,4 +1,3 @@
--- 20260426001_create_users.up.sql
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     login VARCHAR(50) NOT NULL UNIQUE,
